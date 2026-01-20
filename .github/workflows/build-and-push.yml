@@ -44,13 +44,6 @@ jobs:
     # We rely on the implicit availability on the same runner/job scope.
 
 name: Cortex CLI Code Scan
-
-on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
-
 env:
   CORTEX_API_KEY: ${{secrets.CORTEX_API_KEY}}
   CORTEX_API_KEY_ID: ${{secrets.CORTEX_API_KEY_ID}}
