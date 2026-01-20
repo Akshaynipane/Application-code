@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Separate Build and Push Stages
 
 on:
   push:
@@ -6,14 +6,53 @@ on:
       - main
 
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write # Needed to write to the GitHub Container Registry (GHCR)
+      packages: write # Needed for GHCR
 
     steps:
     - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Log in to the Container registry (if pulling base images requires auth)
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata (tags, labels) for Docker
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/Akshaynipane/hello-world-app # Use your username here
+        tags: |
+          type=sha,format=long # e.g., v1.0.0-sha
+
+    - name: Build Docker image ONLY (do not push yet)
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        push: false # Crucial: set to false to only build locally
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        # Cache is required so the next job can access it or it's built once
+
+    # In a typical setup, the image is now cached on the runner's Docker daemon.
+    # We rely on the implicit availability on the same runner/job scope.
+
+
+  push:
+    needs: build # Ensures the build job runs first
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository # Needed to access the context of the build
       uses: actions/checkout@v4
 
     - name: Log in to the Container registry
@@ -21,20 +60,27 @@ jobs:
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }} # The default GITHUB_TOKEN has permission for GHCR
+        password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Extract metadata (tags, labels) for Docker
+    - name: Extract metadata again (to know what tags to push)
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ghcr.io/Akshaynipane/hello-world-app
+        images: ghcr.io/Akshaynipane/hello-world-app # Use your username here
         tags: |
-          type=sha,format=long # Creates a tag like <image-name>:<commit-sha>
+          type=sha,format=long
 
-    - name: Build and push Docker image
+    - name: Build and Push the *same* Docker image (leverages cache from 'build' job)
+      # Because both jobs run on fresh runners, we actually must rebuild AND push here.
+      # Separating the jobs in this manner is inefficient in GitHub Actions.
+      # The previous combined method is strongly recommended.
+      # To truly separate them, you need a shared artifact store or a temporary registry.
+      
+      # Re-running the build-push-action is generally how you handle a separate 'push' job
+      # as the 'build' job's environment is discarded after it finishes.
       uses: docker/build-push-action@v6
       with:
         context: .
-        push: true
+        push: true # Crucial: set to true to push to registry
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
