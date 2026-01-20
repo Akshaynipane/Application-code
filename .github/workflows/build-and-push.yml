@@ -1,10 +1,13 @@
 name: Separate Build and Push Stages
+env:
+  CORTEX_API_KEY: ${{secrets.CORTEX_API_KEY}}
+  CORTEX_API_KEY_ID: ${{secrets.CORTEX_API_KEY_ID}}
+  CORTEX_API_URL: https://api-justruntime.xdr.us.paloaltonetworks.com
 
 on:
   push:
     branches:
       - main
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -42,13 +45,8 @@ jobs:
 
     # In a typical setup, the image is now cached on the runner's Docker daemon.
     # We rely on the implicit availability on the same runner/job scope.
-
-env:
-  CORTEX_API_KEY: ${{secrets.CORTEX_API_KEY}}
-  CORTEX_API_KEY_ID: ${{secrets.CORTEX_API_KEY_ID}}
-  CORTEX_API_URL: https://api-justruntime.xdr.us.paloaltonetworks.com
   
-cortex-code-scan:
+  cortex-code-scan:
     runs-on: ubuntu-latest
 
     steps:
